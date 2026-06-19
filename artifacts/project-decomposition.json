@@ -1,0 +1,147 @@
+{
+  "version": "1.0",
+  "teamCount": 1,
+  "stack": {
+    "language": "JavaScript/HTML/CSS",
+    "monorepoTool": "none",
+    "installCommand": "N/A - single HTML file, no dependencies",
+    "buildCommand": "N/A - single HTML file, no build required",
+    "testCommand": "Manual browser testing or simple JS test runner"
+  },
+  "subsystems": [
+    {
+      "subsystemId": "sudoku-game",
+      "title": "Sudoku Game",
+      "scope": "Complete single-file Sudoku game including game engine, UI rendering, puzzle data, timer, and localStorage persistence",
+      "ownedPaths": [
+        "index.html"
+      ],
+      "interfaces": [
+        {
+          "name": "SudokuEngineAPI",
+          "kind": "api",
+          "contract": "Methods: loadPuzzle(difficulty:string):Puzzle, isFixed(row:int, col:int):boolean, applyMove(row:int, col:int, value:int):MoveResult, getConflicts():CellConflict[], toggleDuplicateHighlight(enabled:boolean):void, resetPuzzle():void, newPuzzle(difficulty:string):Puzzle, getGameState():GameState, incrementMistake():void, getMistakeCount():int, isComplete():boolean. MoveResult = {success:boolean, reason:string} where reason is 'FIXED_CELL' | 'INVALID_RANGE' | 'ALREADY_SET' | 'CONFLICT' | 'OK'"
+        },
+        {
+          "name": "CellSelectionEvent",
+          "kind": "event",
+          "contract": "Payload: {row:int, col:int, isFixed:boolean}"
+        },
+        {
+          "name": "NumberEntryEvent",
+          "kind": "event",
+          "contract": "Payload: {row:int, col:int, value:int, isValid:boolean, isFixed:boolean}"
+        },
+        {
+          "name": "ConflictDetectedEvent",
+          "kind": "event",
+          "contract": "Payload: {conflicts:CellConflict[], highlightEnabled:boolean}. CellConflict = {row:int, col:int, duplicateValue:int, scope:string}"
+        },
+        {
+          "name": "MistakeIncrementedEvent",
+          "kind": "event",
+          "contract": "Payload: {mistakeCount:int}"
+        },
+        {
+          "name": "TimerTickEvent",
+          "kind": "event",
+          "contract": "Payload: {elapsedSeconds:int}"
+        },
+        {
+          "name": "PuzzleCompletedEvent",
+          "kind": "event",
+          "contract": "Payload: {difficulty:string, elapsedTime:int, mistakeCount:int}"
+        },
+        {
+          "name": "PuzzleDataLibrary",
+          "kind": "shared-lib",
+          "contract": "Array of objects: {id:string, difficulty:'easy'|'medium'|'hard', board:string[81], solution:string[81]}. Index 0-80 maps to row-major order; '0' represents empty cell."
+        },
+        {
+          "name": "LocalStorageDB",
+          "kind": "database",
+          "contract": "Key 'sudokuState': JSON serialized GameState. Key 'sudokuPrefs': JSON serialized UserPreferences {duplicateHighlightEnabled:boolean, lastDifficulty:string}. Schema-validated on read; fallback to default state on corruption."
+        }
+      ],
+      "dependsOn": [],
+      "guardrailsSlice": "All ADRs (ADR-001 through ADR-007), all interfaces, all data contracts, security baseline, and scalability requirements"
+    }
+  ],
+  "integrationPlan": {
+    "entrypoints": [
+      "index.html"
+    ],
+    "buildOrder": [
+      "N/A - single HTML file, no build required"
+    ],
+    "sharedContracts": [
+      "SudokuEngineAPI",
+      "CellSelectionEvent",
+      "NumberEntryEvent",
+      "ConflictDetectedEvent",
+      "MistakeIncrementedEvent",
+      "TimerTickEvent",
+      "PuzzleCompletedEvent",
+      "PuzzleDataLibrary",
+      "LocalStorageDB"
+    ],
+    "runtimeComposition": "Single HTML file loaded directly in browser; all JavaScript modules execute within the same browser context"
+  },
+  "coupling": {
+    "crossTeamEdges": 0,
+    "densityScore": 1,
+    "justification": "Single-file constraint (NFR-01) and fully offline operation (NFR-02) mandate that all components (game engine, UI, puzzle data, timer, storage) exist in one tightly coupled unit. No external APIs or services exist to create separable boundaries. The interfaces defined in guardrails are internal JavaScript APIs, not cross-team boundaries. This is a single-developer project."
+  },
+  "metadata": {
+    "derivedFrom": [
+      "tpm-contract.json",
+      "arch-guardrails.json"
+    ],
+    "confidenceMap": [
+      {
+        "section": "initiativeCore",
+        "confidence": "confirmed"
+      },
+      {
+        "section": "requirements",
+        "confidence": "confirmed"
+      },
+      {
+        "section": "acceptanceCriteria",
+        "confidence": "confirmed"
+      },
+      {
+        "section": "risksAndDependencies",
+        "confidence": "confirmed"
+      },
+      {
+        "section": "deliveryIntent",
+        "confidence": "confirmed"
+      },
+      {
+        "section": "interfaces",
+        "confidence": "confirmed"
+      },
+      {
+        "section": "dataContracts",
+        "confidence": "confirmed"
+      },
+      {
+        "section": "scalability",
+        "confidence": "confirmed"
+      },
+      {
+        "section": "securityBaseline",
+        "confidence": "confirmed"
+      },
+      {
+        "section": "adrs",
+        "confidence": "confirmed"
+      }
+    ],
+    "gaps": [
+      "Exact puzzle count per difficulty is not defined (ADR-002 assumes 10+ per difficulty)",
+      "No automated CI/CD performance budget gate specified (ADR-007 defers to manual testing)"
+    ]
+  }
+}

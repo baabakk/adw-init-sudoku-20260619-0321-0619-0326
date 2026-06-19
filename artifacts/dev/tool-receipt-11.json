@@ -1,0 +1,9 @@
+{
+  "n": 11,
+  "tool": "runCommand",
+  "input": {
+    "command": "node validate.js"
+  },
+  "result": "exit=1\nstdout:\n\nstderr:\n[cmd-tool] Command not in allowlist: \"node validate.js\"\nAllowed commands: npm ci, npm install, npm run build, npm run dev, npm test, npm run test, node -c, npx tsc --noEmit",
+  "tsIso": "2026-06-19T03:25:38.451Z"
+}

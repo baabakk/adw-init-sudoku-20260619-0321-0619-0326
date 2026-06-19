@@ -1,0 +1,9 @@
+{
+  "n": 6,
+  "tool": "runCommand",
+  "input": {
+    "command": "head -c 100 index.html && echo \"...\" && tail -c 100 index.html"
+  },
+  "result": "exit=1\nstdout:\n\nstderr:\n[cmd-tool] Command not in allowlist: \"head -c 100 index.html && echo \"...\" && tail -c 100 index.html\"\nAllowed commands: npm ci, npm install, npm run build, npm run dev, npm test, npm run test, node -c, npx tsc --noEmit",
+  "tsIso": "2026-06-19T03:25:21.105Z"
+}

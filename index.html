@@ -1,0 +1,1582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Sudoku</title>
+    <style>
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-cell: #0f3460;
+            --bg-cell-fixed: #1a1a2e;
+            --bg-cell-selected: #e94560;
+            --bg-cell-highlight: rgba(233, 69, 96, 0.15);
+            --bg-cell-conflict: rgba(255, 0, 0, 0.3);
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --text-fixed: #4fc3f7;
+            --border-grid: #e94560;
+            --border-box: #e94560;
+            --accent: #e94560;
+            --accent-hover: #ff6b6b;
+            --success: #4caf50;
+            --warning: #ff9800;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            color: var(--text-primary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 10px;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 500px;
+            gap: 15px;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            padding: 10px 0;
+        }
+
+        .title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--accent);
+            text-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
+        }
+
+        .stats {
+            display: flex;
+            gap: 20px;
+            font-size: 0.9rem;
+        }
+
+        .stat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            font-size: 1.2rem;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Difficulty Selector */
+        .difficulty-selector {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .difficulty-btn {
+            padding: 8px 16px;
+            border: 2px solid var(--accent);
+            background: transparent;
+            color: var(--text-primary);
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .difficulty-btn:hover {
+            background: rgba(233, 69, 96, 0.2);
+        }
+
+        .difficulty-btn.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        /* Sudoku Grid */
+        .grid-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1;
+            max-width: 400px;
+        }
+
+        .sudoku-grid {
+            display: grid;
+            grid-template-columns: repeat(9, 1fr);
+            grid-template-rows: repeat(9, 1fr);
+            width: 100%;
+            height: 100%;
+            border: 3px solid var(--border-grid);
+            border-radius: 8px;
+            overflow: hidden;
+            background: var(--bg-secondary);
+        }
+
+        .cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(1.2rem, 5vw, 1.8rem);
+            font-weight: 500;
+            background: var(--bg-cell);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .cell:nth-child(3n) {
+            border-right: 2px solid var(--border-box);
+        }
+
+        .cell:nth-child(n+19):nth-child(-n+27),
+        .cell:nth-child(n+46):nth-child(-n+54) {
+            border-bottom: 2px solid var(--border-box);
+        }
+
+        .cell:nth-child(9n+1) {
+            border-left: none;
+        }
+
+        .cell:nth-child(-n+9) {
+            border-top: none;
+        }
+
+        .cell:nth-child(9n) {
+            border-right: none;
+        }
+
+        .cell:nth-child(n+73) {
+            border-bottom: none;
+        }
+
+        .cell.fixed {
+            background: var(--bg-cell-fixed);
+            color: var(--text-fixed);
+            font-weight: 700;
+            cursor: default;
+        }
+
+        .cell.selected {
+            background: var(--bg-cell-selected) !important;
+            color: white;
+            z-index: 2;
+        }
+
+        .cell.highlighted {
+            background: var(--bg-cell-highlight);
+        }
+
+        .cell.highlighted.fixed {
+            background: rgba(79, 195, 247, 0.15);
+        }
+
+        .cell.conflict {
+            background: var(--bg-cell-conflict) !important;
+            animation: shake 0.3s ease;
+        }
+
+        .cell.conflict.fixed {
+            background: rgba(255, 0, 0, 0.4) !important;
+        }
+
+        .cell.same-value {
+            background: rgba(233, 69, 96, 0.25);
+        }
+
+        .cell.same-value.fixed {
+            background: rgba(79, 195, 247, 0.25);
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-3px); }
+            75% { transform: translateX(3px); }
+        }
+
+        /* Number Pad */
+        .number-pad {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            width: 100%;
+            max-width: 350px;
+        }
+
+        .num-btn {
+            padding: 12px;
+            font-size: 1.3rem;
+            font-weight: 600;
+            border: 2px solid var(--accent);
+            background: transparent;
+            color: var(--text-primary);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .num-btn:hover, .num-btn:active {
+            background: var(--accent);
+            transform: scale(0.95);
+        }
+
+        .num-btn.clear-btn {
+            background: var(--warning);
+            border-color: var(--warning);
+            color: white;
+        }
+
+        .num-btn.clear-btn:hover {
+            background: #e68900;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            width: 100%;
+        }
+
+        .control-btn {
+            padding: 10px 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border: 2px solid var(--accent);
+            background: transparent;
+            color: var(--text-primary);
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .control-btn:hover {
+            background: var(--accent);
+        }
+
+        .control-btn.primary {
+            background: var(--accent);
+        }
+
+        .control-btn.primary:hover {
+            background: var(--accent-hover);
+        }
+
+        /* Toggle Switch */
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.85rem;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 44px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--bg-secondary);
+            border: 2px solid var(--accent);
+            border-radius: 24px;
+            transition: 0.3s;
+        }
+
+        .toggle-slider::before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 2px;
+            bottom: 2px;
+            background: var(--text-primary);
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background: var(--accent);
+        }
+
+        .toggle-switch input:checked + .toggle-slider::before {
+            transform: translateX(20px);
+        }
+
+        /* Pause Overlay */
+        .pause-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            gap: 20px;
+        }
+
+        .pause-overlay.active {
+            display: flex;
+        }
+
+        .pause-text {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .pause-hint {
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        /* Completion Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border: 3px solid var(--success);
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            max-width: 350px;
+            width: 90%;
+            animation: modalPop 0.4s ease;
+        }
+
+        @keyframes modalPop {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .modal-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--success);
+            margin-bottom: 20px;
+        }
+
+        .modal-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+
+        .modal-stat {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .modal-stat-label {
+            color: var(--text-secondary);
+        }
+
+        .modal-stat-value {
+            font-weight: 600;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        /* Start Screen */
+        .start-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 300;
+            gap: 30px;
+        }
+
+        .start-screen.hidden {
+            display: none;
+        }
+
+        .start-title {
+            font-size: 3rem;
+            font-weight: 700;
+            color: var(--accent);
+            text-shadow: 0 0 20px rgba(233, 69, 96, 0.5);
+        }
+
+        .start-subtitle {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            margin-top: -20px;
+        }
+
+        .start-difficulty {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 250px;
+        }
+
+        .start-btn {
+            padding: 15px 30px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border: 2px solid var(--accent);
+            background: transparent;
+            color: var(--text-primary);
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .start-btn:hover {
+            background: var(--accent);
+            transform: scale(1.05);
+        }
+
+        .start-btn.easy { border-color: var(--success); }
+        .start-btn.easy:hover { background: var(--success); }
+
+        .start-btn.medium { border-color: var(--warning); }
+        .start-btn.medium:hover { background: var(--warning); }
+
+        .start-btn.hard { border-color: var(--accent); }
+        .start-btn.hard:hover { background: var(--accent); }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            body {
+                padding: 8px;
+            }
+
+            .title {
+                font-size: 1.4rem;
+            }
+
+            .stats {
+                gap: 12px;
+            }
+
+            .stat-value {
+                font-size: 1rem;
+            }
+
+            .difficulty-btn {
+                padding: 6px 12px;
+                font-size: 0.75rem;
+            }
+
+            .num-btn {
+                padding: 10px;
+                font-size: 1.1rem;
+            }
+
+            .control-btn {
+                padding: 8px 14px;
+                font-size: 0.8rem;
+            }
+
+            .start-title {
+                font-size: 2.2rem;
+            }
+        }
+
+        @media (max-height: 700px) and (orientation: landscape) {
+            .game-container {
+                flex-direction: row;
+                flex-wrap: wrap;
+                max-width: 800px;
+                justify-content: center;
+            }
+
+            .header {
+                width: 100%;
+            }
+
+            .grid-container {
+                max-width: 350px;
+            }
+
+            .controls-section {
+                display: flex;
+                flex-direction: column;
+                gap: 15px;
+            }
+        }
+
+        /* Accessibility */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            border: 0;
+        }
+
+        .cell:focus {
+            outline: 2px solid white;
+            outline-offset: -2px;
+        }
+
+        .cell:focus:not(.fixed) {
+            outline-color: var(--accent);
+        }
+    </style>
+</head>
+<body>
+    <!-- Start Screen -->
+    <div class="start-screen" id="startScreen">
+        <h1 class="start-title">SUDOKU</h1>
+        <p class="start-subtitle">Select a difficulty to begin</p>
+        <div class="start-difficulty">
+            <button class="start-btn easy" data-difficulty="easy" aria-label="Start Easy Game">Easy</button>
+            <button class="start-btn medium" data-difficulty="medium" aria-label="Start Medium Game">Medium</button>
+            <button class="start-btn hard" data-difficulty="hard" aria-label="Start Hard Game">Hard</button>
+        </div>
+    </div>
+
+    <!-- Pause Overlay -->
+    <div class="pause-overlay" id="pauseOverlay">
+        <div class="pause-text">PAUSED</div>
+        <div class="pause-hint">Click anywhere or press any key to resume</div>
+    </div>
+
+    <!-- Completion Modal -->
+    <div class="modal-overlay" id="completionModal">
+        <div class="modal">
+            <h2 class="modal-title">Congratulations!</h2>
+            <div class="modal-stats">
+                <div class="modal-stat">
+                    <span class="modal-stat-label">Difficulty</span>
+                    <span class="modal-stat-value" id="modalDifficulty">Easy</span>
+                </div>
+                <div class="modal-stat">
+                    <span class="modal-stat-label">Time</span>
+                    <span class="modal-stat-value" id="modalTime">00:00</span>
+                </div>
+                <div class="modal-stat">
+                    <span class="modal-stat-label">Mistakes</span>
+                    <span class="modal-stat-value" id="modalMistakes">0</span>
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button class="control-btn" id="modalNewGame">New Game</button>
+                <button class="control-btn primary" id="modalPlayAgain">Play Again</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Game -->
+    <div class="game-container">
+        <header class="header">
+            <h1 class="title">SUDOKU</h1>
+            <div class="stats">
+                <div class="stat">
+                    <span class="stat-label">Time</span>
+                    <span class="stat-value" id="timer">00:00</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Mistakes</span>
+                    <span class="stat-value" id="mistakes">0</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="difficulty-selector">
+            <button class="difficulty-btn active" data-difficulty="easy">Easy</button>
+            <button class="difficulty-btn" data-difficulty="medium">Medium</button>
+            <button class="difficulty-btn" data-difficulty="hard">Hard</button>
+        </div>
+
+        <div class="grid-container">
+            <div class="sudoku-grid" id="sudokuGrid" role="grid" aria-label="Sudoku puzzle grid">
+                <!-- Cells will be generated by JavaScript -->
+            </div>
+        </div>
+
+        <div class="number-pad" role="group" aria-label="Number input pad">
+            <button class="num-btn" data-num="1" aria-label="Enter 1">1</button>
+            <button class="num-btn" data-num="2" aria-label="Enter 2">2</button>
+            <button class="num-btn" data-num="3" aria-label="Enter 3">3</button>
+            <button class="num-btn" data-num="4" aria-label="Enter 4">4</button>
+            <button class="num-btn" data-num="5" aria-label="Enter 5">5</button>
+            <button class="num-btn" data-num="6" aria-label="Enter 6">6</button>
+            <button class="num-btn" data-num="7" aria-label="Enter 7">7</button>
+            <button class="num-btn" data-num="8" aria-label="Enter 8">8</button>
+            <button class="num-btn" data-num="9" aria-label="Enter 9">9</button>
+            <button class="num-btn clear-btn" data-num="0" aria-label="Clear cell">✕</button>
+        </div>
+
+        <div class="controls">
+            <button class="control-btn" id="pauseBtn" aria-label="Pause game">
+                <span>⏸</span> Pause
+            </button>
+            <button class="control-btn" id="resetBtn" aria-label="Reset puzzle">
+                <span>↺</span> Reset
+            </button>
+            <button class="control-btn primary" id="newGameBtn" aria-label="New puzzle">
+                <span>⟳</span> New
+            </button>
+        </div>
+
+        <div class="toggle-container">
+            <span id="highlightLabel">Highlight Duplicates</span>
+            <label class="toggle-switch">
+                <input type="checkbox" id="highlightToggle" aria-describedby="highlightLabel">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // PUZZLE DATA LIBRARY
+        // ============================================
+        const PUZZLE_LIBRARY = [
+            // EASY PUZZLES (10)
+            { id: 'e1', difficulty: 'easy', board: '530070000600195000098000060800060003400803001700020006060000280000419005000080079', solution: '534678912672195348198342567859761423426853791713924856961537284287419635345286179' },
+            { id: 'e2', difficulty: 'easy', board: '020000000000300004001000500070009000300400001000800000500001000000060000000003020', solution: '826179534579328641341657892764915273358462917192873456435791268617284395983546127' },
+            { id: 'e3', difficulty: 'easy', board: '003020600900305001001806400008102900700000008006708200002609500800203009005010300', solution: '483629517927351648651847392318275469746938125295164873132796284879413756564782931' },
+            { id: 'e4', difficulty: 'easy', board: '200080300060070084030500209000105408000000000402706000301007040720040060004010003', solution: '296187345163745928748359216937125684584693172421876593819432657675218439342961875' },
+            { id: 'e5', difficulty: 'easy', board: '000000907000420180000705026100904000050000040000507009920108000034059000507000000', solution: '653198247897423186241765923186974352372851649549632718924317865815246397736589124' },
+            { id: 'e6', difficulty: 'easy', board: '030050000800601020046000300090000500000020000007000080003000740020406005000080030', solution: '139452678875631924246978351692184537384725196517396482923817645761243859458569713' },
+            { id: 'e7', difficulty: 'easy', board: '005300000800000020070010500400005300010070006003200080060500009004000030000009700', solution: '145327698839654127672198543326941875418275639957362481281433766593716842764829351' },
+            { id: 'e8', difficulty: 'easy', board: '020000000000000004005000300700105000000000000000302007003000600000000000000010080', solution: '126437958389521674745968321678195432453872196912643587293714865861259743537486219' },
+            { id: 'e9', difficulty: 'easy', board: '000000000504000000000070093900000070080040010000000309760010000000000000200804000', solution: '182437965594862731637159248926381574783546129415972386761823492348695817259714653' },
+            { id: 'e10', difficulty: 'easy', board: '000120000300000001070000320006000500000000000005000800049000060800000004000057000', solution: '694127853382956471175438629716384592823691745549273168437815296261749538958362417' },
+            { id: 'e11', difficulty: 'easy', board: '001000000000300050040000600030000080000050000060000040005000300200006000000400100', solution: '781243659629371458435896127314657982897125346562984713158432795273519864946768231' },
+            { id: 'e12', difficulty: 'easy', board: '000000200080400000000603000900005000000080000000100006001007000000004030500000000', solution: '147359268983426175652183497826947513374568921519732684461875392238614759795291436' },
+
+            // MEDIUM PUZZLES (10)
+            { id: 'm1', difficulty: 'medium', board: '020000000000003040050600800003005000000020000000700100080001050400300000000000006', solution: '126497538978523146453618279389145762615782493742369815234871659867954321591236984' },
+            { id: 'm2', difficulty: 'medium', board: '000000907000420180000705026100904000050000040000507009920108000034059000507000000', solution: '653198247897423186241765923186974352372851649549632718924317865815246397736589124' },
+            { id: 'm3', difficulty: 'medium', board: '050607080000000000001000000000800500030000040009002000000000100000000000040503020', solution: '256147938489326175731895642627813594138954267594672813862431759315789426947568131' },
+            { id: 'm4', difficulty: 'medium', board: '000000000000003673003708500030000000000040000000000090200501600087000000000000000', solution: '124569378568317492937482651613754829279138546845926137392675184486291735751843962' },
+            { id: 'm5', difficulty: 'medium', board: '000900800007000300030000040050003000800000002000600050040000600003000500200001000', solution: '641927835897135642532468179156783924823914567479652318784391256913246785265879493' },
+            { id: 'm6', difficulty: 'medium', board: '000000000000107000002000300050400000000000000000302100001008000000090000000000000', solution: '468259173537148629129673548651487932284931756973562814342715867816394275795826341' },
+            { id: 'm7', difficulty: 'medium', board: '000000907000420180000705026100904000050000040000507009920108000034059000507000000', solution: '653198247897423186241765923186974352372851649549632718924317865815246397736589124' },
+            { id: 'm8', difficulty: 'medium', board: '003000500090040001040000300000800050000000000100007000003000200800060000005000100', solution: '183672495796543128542198376439815627258367941617924853364751289821436567975182634' },
+            { id: 'm9', difficulty: 'medium', board: '000000000000003673003708500030000000000040000000000090200501600087000000000000000', solution: '124569378568317492937482651613754829279138546845926137392675184486291735751843962' },
+            { id: 'm10', difficulty: 'medium', board: '050000000000400037000000800009000500000000000003000200030600000400000000000000010', solution: '156842973823491675497365812619738524284156397735924168932617485478583129561279348' },
+            { id: 'm11', difficulty: 'medium', board: '000000000000003673003708500030000000000040000000000090200501600087000000000000000', solution: '124569378568317492937482651613754829279138546845926137392675184486291735751843962' },
+            { id: 'm12', difficulty: 'medium', board: '000000907000420180000705026100904000050000040000507009920108000034059000507000000', solution: '653198247897423186241765923186974352372851649549632718924317865815246397736589124' },
+
+            // HARD PUZZLES (10)
+            { id: 'h1', difficulty: 'hard', board: '005300000800000020070010500400005300010070006003200080060500009004000030000009700', solution: '145327698839654127672198543326941875418275639957362481281433766593716842764829351' },
+            { id: 'h2', difficulty: 'hard', board: '000000000000107000002000300050400000000000000000302100001008000000090000000000000', solution: '468259173537148629129673548651487932284931756973562814342715867816394275795826341' },
+            { id: 'h3', difficulty: 'hard', board: '000000907000420180000705026100904000050000040000507009920108000034059000507000000', solution: '653198247897423186241765923186974352372851649549632718924317865815246397736589124' },
+            { id: 'h4', difficulty: 'hard', board: '800000000003600000070090200050007000000045700000100030001000068008500010090000400', solution: '812753649943682175675491283154237896369845721287169534426978362531826457798534116' },
+            { id: 'h5', difficulty: 'hard', board: '020000000000003040050600800003005000000020000000700100080001050400300000000000006', solution: '126497538978523146453618279389145762615782493742369815234871659867954321591236984' },
+            { id: 'h6', difficulty: 'hard', board: '000000000000003673003708500030000000000040000000000090200501600087000000000000000', solution: '124569378568317492937482651613754829279138546845926137392675184486291735751843962' },
+            { id: 'h7', difficulty: 'hard', board: '005000400000000002030000050000800000400002000000001000060000030200000000008000700', solution: '195732468847651923236948571623874159479125836581369247912486753364597182758213694' },
+            { id: 'h8', difficulty: 'hard', board: '000000000000003673003708500030000000000040000000000090200501600087000000000000000', solution: '124569378568317492937482651613754829279138546845926137392675184486291735751843962' },
+            { id: 'h9', difficulty: 'hard', board: '000000907000420180000705026100904000050000040000507009920108000034059000507000000', solution: '653198247897423186241765923186974352372851649549632718924317865815246397736589124' },
+            { id: 'h10', difficulty: 'hard', board: '020000000000003040050600800003005000000020000000700100080001050400300000000000006', solution: '126497538978523146453618279389145762615782493742369815234871659867954321591236984' },
+            { id: 'h11', difficulty: 'hard', board: '000000000000107000002000300050400000000000000000302100001008000000090000000000000', solution: '468259173537148629129673548651487932284931756973562814342715867816394275795826341' },
+            { id: 'h12', difficulty: 'hard', board: '800000000003600000070090200050007000000045700000100030001000068008500010090000400', solution: '812753649943682175675491283154237896369845721287169534426978362531826457798534116' }
+        ];
+
+        // ============================================
+        // SUDOKU ENGINE API
+        // ============================================
+        class SudokuEngine {
+            constructor() {
+                this.board = [];
+                this.initialBoard = [];
+                this.solution = [];
+                this.fixedCells = [];
+                this.difficulty = 'easy';
+                this.mistakeCount = 0;
+                this.elapsedSeconds = 0;
+                this.isPaused = false;
+                this.isCompleted = false;
+                this.timerInterval = null;
+                this.highlightEnabled = true;
+                this.selectedCell = null;
+                this.listeners = {};
+            }
+
+            // Event System
+            on(event, callback) {
+                if (!this.listeners[event]) {
+                    this.listeners[event] = [];
+                }
+                this.listeners[event].push(callback);
+            }
+
+            emit(event, data) {
+                if (this.listeners[event]) {
+                    this.listeners[event].forEach(cb => cb(data));
+                }
+            }
+
+            // Get puzzles by difficulty
+            getPuzzlesByDifficulty(difficulty) {
+                return PUZZLE_LIBRARY.filter(p => p.difficulty === difficulty);
+            }
+
+            // Load a puzzle
+            loadPuzzle(difficulty) {
+                const puzzles = this.getPuzzlesByDifficulty(difficulty);
+                if (puzzles.length === 0) {
+                    throw new Error(`No puzzles found for difficulty: ${difficulty}`);
+                }
+                const puzzle = puzzles[Math.floor(Math.random() * puzzles.length)];
+                return this.loadPuzzleData(puzzle);
+            }
+
+            loadPuzzleData(puzzle) {
+                this.stopTimer();
+                this.board = [];
+                this.initialBoard = [];
+                this.solution = puzzle.solution.split('');
+                this.fixedCells = [];
+                this.difficulty = puzzle.difficulty;
+                this.mistakeCount = 0;
+                this.elapsedSeconds = 0;
+                this.isCompleted = false;
+                this.selectedCell = null;
+
+                for (let i = 0; i < 81; i++) {
+                    const value = parseInt(puzzle.board[i]);
+                    this.board.push(value);
+                    this.initialBoard.push(value);
+                    this.fixedCells.push(value !== 0);
+                }
+
+                this.emit('PuzzleLoadedEvent', {
+                    difficulty: this.difficulty,
+                    puzzleId: puzzle.id
+                });
+
+                return this.getPuzzleState();
+            }
+
+            // Check if cell is fixed
+            isFixed(row, col) {
+                const index = row * 9 + col;
+                return this.fixedCells[index];
+            }
+
+            // Get cell value
+            getCellValue(row, col) {
+                return this.board[row * 9 + col];
+            }
+
+            // Apply a move
+            applyMove(row, col, value) {
+                const index = row * 9 + col;
+
+                // Check if cell is fixed
+                if (this.fixedCells[index]) {
+                    return { success: false, reason: 'FIXED_CELL' };
+                }
+
+                // Check value range
+                if (value < 0 || value > 9) {
+                    return { success: false, reason: 'INVALID_RANGE' };
+                }
+
+                // Check if already set to same value
+                if (this.board[index] === value) {
+                    return { success: false, reason: 'ALREADY_SET' };
+                }
+
+                // Start timer on first move
+                if (this.elapsedSeconds === 0 && value !== 0) {
+                    this.startTimer();
+                }
+
+                // Set the value
+                this.board[index] = value;
+
+                // Check for conflicts
+                const conflicts = this.getConflicts();
+                const hasNewConflict = conflicts.some(c => c.row === row && c.col === col);
+
+                if (hasNewConflict && value !== 0) {
+                    this.incrementMistake();
+                    return { success: true, reason: 'CONFLICT' };
+                }
+
+                this.emit('NumberEntryEvent', {
+                    row,
+                    col,
+                    value,
+                    isValid: value === 0 || !hasNewConflict,
+                    isFixed: false
+                });
+
+                // Check for completion
+                if (this.isComplete()) {
+                    this.handleCompletion();
+                }
+
+                return { success: true, reason: 'OK' };
+            }
+
+            // Get all conflicts
+            getConflicts() {
+                const conflicts = [];
+
+                // Check rows
+                for (let row = 0; row < 9; row++) {
+                    const seen = {};
+                    for (let col = 0; col < 9; col++) {
+                        const val = this.board[row * 9 + col];
+                        if (val !== 0) {
+                            if (seen[val] !== undefined) {
+                                conflicts.push({
+                                    row,
+                                    col,
+                                    duplicateValue: val,
+                                    scope: 'row'
+                                });
+                                conflicts.push({
+                                    row: seen[val],
+                                    col,
+                                    duplicateValue: val,
+                                    scope: 'row'
+                                });
+                            } else {
+                                seen[val] = row;
+                            }
+                        }
+                    }
+                }
+
+                // Check columns
+                for (let col = 0; col < 9; col++) {
+                    const seen = {};
+                    for (let row = 0; row < 9; row++) {
+                        const val = this.board[row * 9 + col];
+                        if (val !== 0) {
+                            if (seen[val] !== undefined) {
+                                conflicts.push({
+                                    row,
+                                    col,
+                                    duplicateValue: val,
+                                    scope: 'col'
+                                });
+                                conflicts.push({
+                                    row: seen[val],
+                                    col,
+                                    duplicateValue: val,
+                                    scope: 'col'
+                                });
+                            } else {
+                                seen[val] = row;
+                            }
+                        }
+                    }
+                }
+
+                // Check 3x3 boxes
+                for (let boxRow = 0; boxRow < 3; boxRow++) {
+                    for (let boxCol = 0; boxCol < 3; boxCol++) {
+                        const seen = {};
+                        for (let i = 0; i < 9; i++) {
+                            const row = boxRow * 3 + Math.floor(i / 3);
+                            const col = boxCol * 3 + (i % 3);
+                            const val = this.board[row * 9 + col];
+                            if (val !== 0) {
+                                if (seen[val] !== undefined) {
+                                    conflicts.push({
+                                        row,
+                                        col,
+                                        duplicateValue: val,
+                                        scope: 'box'
+                                    });
+                                    const prevRow = boxRow * 3 + Math.floor(seen[val] / 3);
+                                    const prevCol = boxCol * 3 + (seen[val] % 3);
+                                    conflicts.push({
+                                        row: prevRow,
+                                        col: prevCol,
+                                        duplicateValue: val,
+                                        scope: 'box'
+                                    });
+                                } else {
+                                    seen[val] = i;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Remove duplicates
+                const uniqueConflicts = [];
+                const seen = new Set();
+                for (const c of conflicts) {
+                    const key = `${c.row},${c.col}`;
+                    if (!seen.has(key)) {
+                        seen.add(key);
+                        uniqueConflicts.push(c);
+                    }
+                }
+
+                return uniqueConflicts;
+            }
+
+            // Toggle duplicate highlighting
+            toggleDuplicateHighlight(enabled) {
+                this.highlightEnabled = enabled;
+                this.emit('HighlightToggledEvent', { enabled });
+            }
+
+            // Reset puzzle
+            resetPuzzle() {
+                this.stopTimer();
+                for (let i = 0; i < 81; i++) {
+                    this.board[i] = this.initialBoard[i];
+                }
+                this.mistakeCount = 0;
+                this.elapsedSeconds = 0;
+                this.isCompleted = false;
+                this.selectedCell = null;
+
+                this.emit('PuzzleResetEvent', {});
+                this.updateUI();
+            }
+
+            // New puzzle
+            newPuzzle(difficulty) {
+                return this.loadPuzzle(difficulty);
+            }
+
+            // Get game state
+            getGameState() {
+                return {
+                    board: [...this.board],
+                    difficulty: this.difficulty,
+                    elapsedSeconds: this.elapsedSeconds,
+                    mistakeCount: this.mistakeCount,
+                    isPaused: this.isPaused,
+                    isCompleted: this.isCompleted,
+                    highlightEnabled: this.highlightEnabled
+                };
+            }
+
+            // Increment mistake
+            incrementMistake() {
+                this.mistakeCount++;
+                this.emit('MistakeIncrementedEvent', {
+                    mistakeCount: this.mistakeCount
+                });
+            }
+
+            // Get mistake count
+            getMistakeCount() {
+                return this.mistakeCount;
+            }
+
+            // Check if complete
+            isComplete() {
+                // Check if all cells are filled
+                for (let i = 0; i < 81; i++) {
+                    if (this.board[i] === 0) return false;
+                }
+                // Check if solution matches
+                for (let i = 0; i < 81; i++) {
+                    if (this.board[i] !== parseInt(this.solution[i])) return false;
+                }
+                return true;
+            }
+
+            // Handle completion
+            handleCompletion() {
+                this.stopTimer();
+                this.isCompleted = true;
+                this.emit('PuzzleCompletedEvent', {
+                    difficulty: this.difficulty,
+                    elapsedTime: this.elapsedSeconds,
+                    mistakeCount: this.mistakeCount
+                });
+            }
+
+            // Timer functions
+            startTimer() {
+                if (this.timerInterval) return;
+                this.isPaused = false;
+                this.timerInterval = setInterval(() => {
+                    if (!this.isPaused && !this.isCompleted) {
+                        this.elapsedSeconds++;
+                        this.emit('TimerTickEvent', {
+                            elapsedSeconds: this.elapsedSeconds
+                        });
+                    }
+                }, 1000);
+            }
+
+            stopTimer() {
+                if (this.timerInterval) {
+                    clearInterval(this.timerInterval);
+                    this.timerInterval = null;
+                }
+            }
+
+            pause() {
+                this.isPaused = true;
+                this.emit('PauseEvent', {});
+            }
+
+            resume() {
+                this.isPaused = false;
+                this.emit('ResumeEvent', {});
+            }
+
+            // Get puzzle state for rendering
+            getPuzzleState() {
+                return {
+                    board: this.board.map((val, idx) => ({
+                        value: val,
+                        isFixed: this.fixedCells[idx],
+                        row: Math.floor(idx / 9),
+                        col: idx % 9
+                    })),
+                    difficulty: this.difficulty,
+                    solution: this.solution.join('')
+                };
+            }
+
+            // Get selected cell
+            getSelectedCell() {
+                return this.selectedCell;
+            }
+
+            // Set selected cell
+            setSelectedCell(row, col) {
+                this.selectedCell = { row, col };
+                this.emit('CellSelectionEvent', {
+                    row,
+                    col,
+                    isFixed: this.isFixed(row, col)
+                });
+            }
+        }
+
+        // ============================================
+        // LOCAL STORAGE DATABASE
+        // ============================================
+        class LocalStorageDB {
+            constructor() {
+                this.stateKey = 'sudokuState';
+                this.prefsKey = 'sudokuPrefs';
+            }
+
+            saveState(state) {
+                try {
+                    localStorage.setItem(this.stateKey, JSON.stringify(state));
+                } catch (e) {
+                    console.warn('Failed to save state:', e);
+                }
+            }
+
+            loadState() {
+                try {
+                    const data = localStorage.getItem(this.stateKey);
+                    if (data) {
+                        const state = JSON.parse(data);
+                        // Validate state structure
+                        if (state && typeof state.board === 'object' && state.difficulty) {
+                            return state;
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Failed to load state:', e);
+                }
+                return null;
+            }
+
+            clearState() {
+                try {
+                    localStorage.removeItem(this.stateKey);
+                } catch (e) {
+                    console.warn('Failed to clear state:', e);
+                }
+            }
+
+            savePrefs(prefs) {
+                try {
+                    localStorage.setItem(this.prefsKey, JSON.stringify(prefs));
+                } catch (e) {
+                    console.warn('Failed to save prefs:', e);
+                }
+            }
+
+            loadPrefs() {
+                try {
+                    const data = localStorage.getItem(this.prefsKey);
+                    if (data) {
+                        const prefs = JSON.parse(data);
+                        if (prefs && typeof prefs.duplicateHighlightEnabled === 'boolean') {
+                            return prefs;
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Failed to load prefs:', e);
+                }
+                return {
+                    duplicateHighlightEnabled: true,
+                    lastDifficulty: 'easy'
+                };
+            }
+        }
+
+        // ============================================
+        // UI CONTROLLER
+        // ============================================
+        class SudokuUI {
+            constructor() {
+                this.engine = new SudokuEngine();
+                this.db = new LocalStorageDB();
+                this.cells = [];
+                this.isInitialized = false;
+
+                this.initElements();
+                this.initEventListeners();
+                this.bindEngineEvents();
+            }
+
+            initElements() {
+                this.startScreen = document.getElementById('startScreen');
+                this.pauseOverlay = document.getElementById('pauseOverlay');
+                this.completionModal = document.getElementById('completionModal');
+                this.sudokuGrid = document.getElementById('sudokuGrid');
+                this.timerDisplay = document.getElementById('timer');
+                this.mistakesDisplay = document.getElementById('mistakes');
+                this.highlightToggle = document.getElementById('highlightToggle');
+                this.difficultyBtns = document.querySelectorAll('.difficulty-btn');
+                this.startBtns = document.querySelectorAll('.start-btn');
+                this.numBtns = document.querySelectorAll('.num-btn');
+            }
+
+            initEventListeners() {
+                // Start screen buttons
+                this.startBtns.forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const difficulty = btn.dataset.difficulty;
+                        this.startGame(difficulty);
+                    });
+                });
+
+                // Difficulty selector
+                this.difficultyBtns.forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const difficulty = btn.dataset.difficulty;
+                        this.changeDifficulty(difficulty);
+                    });
+                });
+
+                // Number pad
+                this.numBtns.forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const num = parseInt(btn.dataset.num);
+                        this.enterNumber(num);
+                    });
+                });
+
+                // Control buttons
+                document.getElementById('pauseBtn').addEventListener('click', () => this.togglePause());
+                document.getElementById('resetBtn').addEventListener('click', () => this.resetPuzzle());
+                document.getElementById('newGameBtn').addEventListener('click', () => this.newPuzzle());
+
+                // Highlight toggle
+                this.highlightToggle.addEventListener('change', (e) => {
+                    this.engine.toggleDuplicateHighlight(e.target.checked);
+                    this.db.savePrefs({ ...this.db.loadPrefs(), duplicateHighlightEnabled: e.target.checked });
+                });
+
+                // Pause overlay click
+                this.pauseOverlay.addEventListener('click', () => this.togglePause());
+
+                // Modal buttons
+                document.getElementById('modalNewGame').addEventListener('click', () => {
+                    this.completionModal.classList.remove('active');
+                    this.startScreen.classList.remove('hidden');
+                });
+
+                document.getElementById('modalPlayAgain').addEventListener('click', () => {
+                    this.completionModal.classList.remove('active');
+                    this.engine.newPuzzle(this.engine.difficulty);
+                });
+
+                // Keyboard input
+                document.addEventListener('keydown', (e) => this.handleKeydown(e));
+
+                // Visibility change (auto-pause)
+                document.addEventListener('visibilitychange', () => {
+                    if (document.hidden && !this.engine.isCompleted && this.isInitialized) {
+                        this.engine.pause();
+                        this.pauseOverlay.classList.add('active');
+                    }
+                });
+            }
+
+            bindEngineEvents() {
+                this.engine.on('TimerTickEvent', (data) => {
+                    this.timerDisplay.textContent = this.formatTime(data.elapsedSeconds);
+                });
+
+                this.engine.on('MistakeIncrementedEvent', (data) => {
+                    this.mistakesDisplay.textContent = data.mistakeCount;
+                });
+
+                this.engine.on('CellSelectionEvent', (data) => {
+                    this.updateCellSelection(data.row, data.col);
+                });
+
+                this.engine.on('PuzzleLoadedEvent', () => {
+                    this.renderGrid();
+                    this.updateUI();
+                });
+
+                this.engine.on('PuzzleResetEvent', () => {
+                    this.renderGrid();
+                    this.updateUI();
+                });
+
+                this.engine.on('PuzzleCompletedEvent', (data) => {
+                    this.showCompletionModal(data);
+                });
+
+                this.engine.on('HighlightToggledEvent', () => {
+                    this.updateConflicts();
+                });
+
+                this.engine.on('NumberEntryEvent', () => {
+                    this.updateConflicts();
+                });
+            }
+
+            startGame(difficulty) {
+                this.startScreen.classList.add('hidden');
+                this.isInitialized = true;
+                
+                // Load preferences
+                const prefs = this.db.loadPrefs();
+                this.highlightToggle.checked = prefs.duplicateHighlightEnabled;
+                this.engine.toggleDuplicateHighlight(prefs.duplicateHighlightEnabled);
+
+                // Load puzzle
+                this.engine.loadPuzzle(difficulty);
+                this.updateDifficultyButtons(difficulty);
+            }
+
+            changeDifficulty(difficulty) {
+                this.engine.newPuzzle(difficulty);
+                this.updateDifficultyButtons(difficulty);
+            }
+
+            updateDifficultyButtons(difficulty) {
+                this.difficultyBtns.forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.difficulty === difficulty);
+                });
+            }
+
+            renderGrid() {
+                this.sudokuGrid.innerHTML = '';
+                this.cells = [];
+
+                const state = this.engine.getPuzzleState();
+
+                for (let i = 0; i < 81; i++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.index = i;
+                    cell.dataset.row = state.board[i].row;
+                    cell.dataset.col = state.board[i].col;
+                    cell.setAttribute('role', 'gridcell');
+                    cell.setAttribute('tabindex', '0');
+
+                    if (state.board[i].isFixed) {
+                        cell.classList.add('fixed');
+                    }
+
+                    if (state.board[i].value !== 0) {
+                        cell.textContent = state.board[i].value;
+                    }
+
+                    cell.addEventListener('click', () => {
+                        this.selectCell(state.board[i].row, state.board[i].col);
+                    });
+
+                    this.sudokuGrid.appendChild(cell);
+                    this.cells.push(cell);
+                }
+            }
+
+            selectCell(row, col) {
+                this.engine.setSelectedCell(row, col);
+            }
+
+            updateCellSelection(row, col) {
+                // Remove all selection classes
+                this.cells.forEach(cell => {
+                    cell.classList.remove('selected', 'highlighted', 'same-value');
+                });
+
+                if (row === null || col === null) return;
+
+                const selectedValue = this.engine.getCellValue(row, col);
+
+                // Highlight row, column, and box
+                for (let i = 0; i < 81; i++) {
+                    const cellRow = Math.floor(i / 9);
+                    const cellCol = i % 9;
+                    const boxRow = Math.floor(row / 3);
+                    const boxCol = Math.floor(col / 3);
+                    const cellBoxRow = Math.floor(cellRow / 3);
+                    const cellBoxCol = Math.floor(cellCol / 3);
+
+                    if (cellRow === row || cellCol === col || 
+                        (cellBoxRow === boxRow && cellBoxCol === boxCol)) {
+                        this.cells[i].classList.add('highlighted');
+                    }
+
+                    // Highlight same values
+                    if (this.engine.highlightEnabled && selectedValue !== 0) {
+                        const cellValue = this.engine.getCellValue(cellRow, cellCol);
+                        if (cellValue === selectedValue && (cellRow !== row || cellCol !== col)) {
+                            this.cells[i].classList.add('same-value');
+                        }
+                    }
+                }
+
+                // Mark selected cell
+                const index = row * 9 + col;
+                this.cells[index].classList.add('selected');
+                this.cells[index].focus();
+            }
+
+            enterNumber(num) {
+                const selected = this.engine.getSelectedCell();
+                if (!selected) return;
+
+                const result = this.engine.applyMove(selected.row, selected.col, num);
+
+                // Update cell display
+                const index = selected.row * 9 + selected.col;
+                const cell = this.cells[index];
+
+                if (num === 0) {
+                    cell.textContent = '';
+                } else {
+                    cell.textContent = num;
+                }
+
+                // Visual feedback for conflicts
+                if (result.reason === 'CONFLICT') {
+                    cell.classList.add('conflict');
+                    setTimeout(() => cell.classList.remove('conflict'), 500);
+                }
+
+                // Update conflicts display
+                this.updateConflicts();
+
+                // Re-select cell to update highlighting
+                this.selectCell(selected.row, selected.col);
+            }
+
+            updateConflicts() {
+                // Remove all conflict classes
+                this.cells.forEach(cell => cell.classList.remove('conflict'));
+
+                if (!this.engine.highlightEnabled) return;
+
+                const conflicts = this.engine.getConflicts();
+                conflicts.forEach(conflict => {
+                    const index = conflict.row * 9 + conflict.col;
+                    this.cells[index].classList.add('conflict');
+                });
+            }
+
+            handleKeydown(e) {
+                // Resume from pause on any key
+                if (this.pauseOverlay.classList.contains('active')) {
+                    this.togglePause();
+                    return;
+                }
+
+                if (!this.isInitialized) return;
+
+                const selected = this.engine.getSelectedCell();
+
+                // Number keys
+                if (e.key >= '1' && e.key <= '9') {
+                    e.preventDefault();
+                    this.enterNumber(parseInt(e.key));
+                } else if (e.key === '0' || e.key === 'Backspace' || e.key === 'Delete') {
+                    e.preventDefault();
+                    this.enterNumber(0);
+                }
+
+                // Arrow key navigation
+                if (selected && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                    e.preventDefault();
+                    let newRow = selected.row;
+                    let newCol = selected.col;
+
+                    switch (e.key) {
+                        case 'ArrowUp': newRow = Math.max(0, newRow - 1); break;
+                        case 'ArrowDown': newRow = Math.min(8, newRow + 1); break;
+                        case 'ArrowLeft': newCol = Math.max(0, newCol - 1); break;
+                        case 'ArrowRight': newCol = Math.min(8, newCol + 1); break;
+                    }
+
+                    this.selectCell(newRow, newCol);
+                }
+
+                // Tab navigation
+                if (e.key === 'Tab') {
+                    e.preventDefault();
+                    if (selected) {
+                        let nextIndex = selected.row * 9 + selected.col + (e.shiftKey ? -1 : 1);
+                        if (nextIndex < 0) nextIndex = 80;
+                        if (nextIndex > 80) nextIndex = 0;
+                        const newRow = Math.floor(nextIndex / 9);
+                        const newCol = nextIndex % 9;
+                        this.selectCell(newRow, newCol);
+                    }
+                }
+            }
+
+            togglePause() {
+                if (this.engine.isCompleted) return;
+
+                if (this.engine.isPaused) {
+                    this.engine.resume();
+                    this.pauseOverlay.classList.remove('active');
+                } else {
+                    this.engine.pause();
+                    this.pauseOverlay.classList.add('active');
+                }
+            }
+
+            resetPuzzle() {
+                if (confirm('Reset the puzzle? All your progress will be lost.')) {
+                    this.engine.resetPuzzle();
+                }
+            }
+
+            newPuzzle() {
+                if (confirm('Start a new puzzle? Your current progress will be lost.')) {
+                    this.engine.newPuzzle(this.engine.difficulty);
+                }
+            }
+
+            updateUI() {
+                this.timerDisplay.textContent = this.formatTime(this.engine.elapsedSeconds);
+                this.mistakesDisplay.textContent = this.engine.mistakeCount;
+            }
+
+            formatTime(seconds) {
+                const mins = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            }
+
+            showCompletionModal(data) {
+                document.getElementById('modalDifficulty').textContent = 
+                    data.difficulty.charAt(0).toUpperCase() + data.difficulty.slice(1);
+                document.getElementById('modalTime').textContent = this.formatTime(data.elapsedTime);
+                document.getElementById('modalMistakes').textContent = data.mistakeCount;
+                this.completionModal.classList.add('active');
+            }
+        }
+
+        // ============================================
+        // INITIALIZE APPLICATION
+        // ============================================
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check for saved preferences
+            const db = new LocalStorageDB();
+            const prefs = db.loadPrefs();
+            
+            // Set initial toggle state
+            document.getElementById('highlightToggle').checked = prefs.duplicateHighlightEnabled;
+
+            // Initialize UI
+            window.sudokuApp = new SudokuUI();
+        });
+    </script>
+</body>
+</html>
