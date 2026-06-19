@@ -1,0 +1,9 @@
+{
+  "n": 13,
+  "tool": "listFiles",
+  "input": {
+    "glob": "*"
+  },
+  "result": "README.md\nindex.html\nvalidate.js",
+  "tsIso": "2026-06-19T03:25:46.648Z"
+}

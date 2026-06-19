@@ -1,0 +1,11 @@
+{"from":"user","to":"tpm","requestPerformative":"propose","responsePerformative":"confirm","durationMs":1687,"recordedAtIso":"2026-06-19T03:21:11.655Z"}
+{"from":"tpm","to":"architect","requestPerformative":"delegate","responsePerformative":"propose","durationMs":1744,"recordedAtIso":"2026-06-19T03:23:39.688Z"}
+{"from":"architect","to":"tpm","requestPerformative":"propose","responsePerformative":"ack-revision","durationMs":3711,"recordedAtIso":"2026-06-19T03:23:43.513Z"}
+{"from":"tpm","to":"architect","requestPerformative":"ack-revision","responsePerformative":"propose","durationMs":15283,"recordedAtIso":"2026-06-19T03:23:59.105Z"}
+{"from":"architect","to":"tpm","requestPerformative":"propose","responsePerformative":"ack-approve","durationMs":5088,"recordedAtIso":"2026-06-19T03:24:04.433Z"}
+{"from":"architect","to":"developer","requestPerformative":"delegate","responsePerformative":"propose","durationMs":3282,"recordedAtIso":"2026-06-19T03:24:21.554Z"}
+{"from":"developer","to":"architect","requestPerformative":"propose","responsePerformative":"ack-approve","durationMs":4923,"recordedAtIso":"2026-06-19T03:24:26.540Z"}
+{"from":"orchestrator","to":"developer","requestPerformative":"delegate","responsePerformative":"inform","durationMs":103125,"recordedAtIso":"2026-06-19T03:26:12.053Z"}
+{"from":"orchestrator","to":"developer","requestPerformative":"delegate","responsePerformative":"inform","durationMs":9,"recordedAtIso":"2026-06-19T03:26:12.341Z"}
+{"from":"developer","to":"architect","requestPerformative":"propose","responsePerformative":"ack-revision","durationMs":4591,"recordedAtIso":"2026-06-19T03:26:16.999Z"}
+{"from":"orchestrator","to":"developer","requestPerformative":"delegate","responsePerformative":"inform","durationMs":341,"recordedAtIso":"2026-06-19T03:26:17.575Z"}
